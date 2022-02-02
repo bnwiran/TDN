@@ -5,6 +5,7 @@
 
 from torch.optim.lr_scheduler import _LRScheduler, MultiStepLR, CosineAnnealingLR
 
+
 class GradualWarmupScheduler(_LRScheduler):
     """ Gradually warm-up(increasing) learning rate in optimizer.
       Proposed in 'Accurate, Large Minibatch SGD: Training ImageNet in 1 Hour'.
@@ -78,8 +79,7 @@ def get_scheduler(optimizer, n_iter_per_epoch, args):
     else:
         raise NotImplementedError(f"scheduler {args.lr_scheduler} not supported")
 
-
-    if args.warmup_epoch != 0 :
+    if args.warmup_epoch != 0:
         scheduler = GradualWarmupScheduler(
             optimizer,
             multiplier=args.warmup_multiplier,

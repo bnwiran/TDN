@@ -5,9 +5,11 @@
 
 import torch
 
+
 class Identity(torch.nn.Module):
     def forward(self, input):
         return input
+
 
 class SegmentConsensus(torch.nn.Module):
     def __init__(self, consensus_type, dim=1):

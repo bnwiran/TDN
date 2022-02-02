@@ -26,13 +26,13 @@ class GroupRandomCrop(object):
         y1 = random.randint(0, h - th)
 
         for img in img_group:
-            assert(img.size[0] == w and img.size[1] == h)
+            assert (img.size[0] == w and img.size[1] == h)
             if w == tw and h == th:
                 out_images.append(img)
             else:
                 out_images.append(img.crop((x1, y1, x1 + tw, y1 + th)))
 
-        return out_images,label
+        return out_images, label
 
 
 class GroupCenterCrop(object):
@@ -41,12 +41,13 @@ class GroupCenterCrop(object):
 
     def __call__(self, img):
         img_group, label = img
-        return [self.worker(img) for img in img_group],label
+        return [self.worker(img) for img in img_group], label
 
 
 class GroupRandomHorizontalFlip(object):
     """Randomly horizontally flips the given PIL.Image with a probability of 0.5
     """
+
     def __init__(self, is_flow=False):
         self.is_flow = is_flow
 
@@ -58,27 +59,28 @@ class GroupRandomHorizontalFlip(object):
             if self.is_flow:
                 for i in range(0, len(ret), 2):
                     ret[i] = ImageOps.invert(ret[i])  # invert flow pixel values when flipping
-            return ret,label
+            return ret, label
         else:
             return img_group, label
 
-class GroupRandomHorizontalFlip_sth(object):
-	"""Randomly horizontally flips the given PIL.Image with a probability of 0.5
-	"""
-	def __init__(self, target_transform = None):
-		self.target_transform = target_transform
 
-	def __call__(self, img):
-		img_group, label = img
-		v = random.random()
-		if v < 0.5:
-			ret = [img.transpose(Image.FLIP_LEFT_RIGHT) for img in img_group]
-			if self.target_transform is not None:
-				if label in self.target_transform:
-					label = self.target_transform[label]
-			return ret,label
-		else:
-			return img_group, label
+class GroupRandomHorizontalFlip_sth(object):
+    """Randomly horizontally flips the given PIL.Image with a probability of 0.5"""
+
+    def __init__(self, target_transform=None):
+        self.target_transform = target_transform
+
+    def __call__(self, img):
+        img_group, label = img
+        v = random.random()
+        if v < 0.5:
+            ret = [img.transpose(Image.FLIP_LEFT_RIGHT) for img in img_group]
+            if self.target_transform is not None:
+                if label in self.target_transform:
+                    label = self.target_transform[label]
+            return ret, label
+        else:
+            return img_group, label
 
 
 class GroupNormalize(object):
@@ -88,8 +90,8 @@ class GroupNormalize(object):
 
     def __call__(self, Te):
         tensor, label = Te
-        rep_mean = self.mean * (tensor.size()[0]//len(self.mean))
-        rep_std = self.std * (tensor.size()[0]//len(self.std))
+        rep_mean = self.mean * (tensor.size()[0] // len(self.mean))
+        rep_std = self.std * (tensor.size()[0] // len(self.std))
 
         # TODO: make efficient
         for t, m, s in zip(tensor, rep_mean, rep_std):
@@ -112,7 +114,7 @@ class GroupScale(object):
 
     def __call__(self, img):
         img_group, label = img
-        return [self.worker(img) for img in img_group],label
+        return [self.worker(img) for img in img_group], label
 
 
 class GroupOverSample(object):
@@ -128,7 +130,7 @@ class GroupOverSample(object):
     def __call__(self, img):
         img_group, label = img
         if self.scale_worker is not None:
-            img_group ,label = self.scale_worker(img)
+            img_group, label = self.scale_worker(img)
 
         image_w, image_h = img_group[0].size
         crop_w, crop_h = self.crop_size
@@ -151,7 +153,7 @@ class GroupOverSample(object):
             oversample_group.extend(normal_group)
             if self.flip:
                 oversample_group.extend(flip_group)
-        return oversample_group,label
+        return oversample_group, label
 
 
 class GroupFullResSample(object):
@@ -167,7 +169,7 @@ class GroupFullResSample(object):
     def __call__(self, img):
         img_group, label = img
         if self.scale_worker is not None:
-            img_group ,label = self.scale_worker(img)
+            img_group, label = self.scale_worker(img)
 
         image_w, image_h = img_group[0].size
         crop_w, crop_h = self.crop_size
@@ -197,7 +199,7 @@ class GroupFullResSample(object):
 
             oversample_group.extend(normal_group)
             oversample_group.extend(flip_group)
-        return oversample_group,label
+        return oversample_group, label
 
 
 class GroupMultiScaleCrop(object):
@@ -276,11 +278,12 @@ class GroupMultiScaleCrop(object):
 
 class GroupRandomSizedCrop(object):
     """Random crop the given PIL.Image to a random size of (0.08 to 1.0) of the original size
-    and and a random aspect ratio of 3/4 to 4/3 of the original aspect ratio
+    and a random aspect ratio of 3/4 to 4/3 of the original aspect ratio
     This is popularly used to train the Inception networks
     size: size of the smaller edge
     interpolation: Default: PIL.Image.BILINEAR
     """
+
     def __init__(self, size, interpolation=Image.BILINEAR):
         self.size = size
         self.interpolation = interpolation
@@ -312,9 +315,9 @@ class GroupRandomSizedCrop(object):
             out_group = list()
             for img in img_group:
                 img = img.crop((x1, y1, x1 + w, y1 + h))
-                assert(img.size == (w, h))
+                assert (img.size == (w, h))
                 out_group.append(img.resize((self.size, self.size), self.interpolation))
-            return out_group,label
+            return out_group, label
         else:
             # Fallback
             scale = GroupScale(self.size, interpolation=self.interpolation)
@@ -330,22 +333,23 @@ class Stack(object):
     def __call__(self, img):
         img_group, label = img
         if img_group[0].mode == 'L':
-            return np.concatenate([np.expand_dims(x, 2) for x in img_group], axis=2),label
+            return np.concatenate([np.expand_dims(x, 2) for x in img_group], axis=2), label
         elif img_group[0].mode == 'RGB':
             if self.roll:
                 return np.concatenate([np.array(x)[:, :, ::-1] for x in img_group], axis=2)
             else:
-                return np.concatenate(img_group, axis=2),label
+                return np.concatenate(img_group, axis=2), label
 
 
 class ToTorchFormatTensor(object):
     """ Converts a PIL.Image (RGB) or numpy.ndarray (H x W x C) in the range [0, 255]
     to a torch.FloatTensor of shape (C x H x W) in the range [0.0, 1.0] """
+
     def __init__(self, div=True):
         self.div = div
 
     def __call__(self, pi):
-        pic,label = pi
+        pic, label = pi
         if isinstance(pic, np.ndarray):
             # handle numpy array
             img = torch.from_numpy(pic).permute(2, 0, 1).contiguous()
@@ -356,7 +360,7 @@ class ToTorchFormatTensor(object):
             # put it from HWC to CHW format
             # yikes, this transpose takes 80% of the loading time/CPU
             img = img.transpose(0, 1).transpose(0, 2).contiguous()
-        return img.float().div(255) if self.div else img.float(),label
+        return img.float().div(255) if self.div else img.float(), label
 
 
 class IdentityTransform(object):

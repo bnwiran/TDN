@@ -10,12 +10,13 @@ from ops.transforms import *
 from torch.nn.init import normal_, constant_
 from ops.tdn_net import tdn_net
 
+
 class TSN(nn.Module):
     def __init__(self, num_class, num_segments, modality,
                  base_model='resnet101', new_length=None,
                  consensus_type='avg', before_softmax=True,
-                 dropout=0.8, img_feature_dim=256,crop_num=1,
-                 partial_bn=True, print_spec=True, pretrain='imagenet',fc_lr5=False):
+                 dropout=0.8, img_feature_dim=256, crop_num=1,
+                 partial_bn=True, print_spec=True, pretrain='imagenet', fc_lr5=False):
         super(TSN, self).__init__()
         self.modality = modality
         self.num_segments = num_segments
@@ -28,7 +29,7 @@ class TSN(nn.Module):
         self.pretrain = pretrain
         self.base_model_name = base_model
         self.fc_lr5 = fc_lr5  # fine_tuning for UCF/HMDB
-        self.target_transforms = {86:87,87:86,93:94,94:93,166:167,167:166}
+        self.target_transforms = {86: 87, 87: 86, 93: 94, 94: 93, 166: 167, 167: 166}
 
         if not before_softmax and consensus_type != 'avg':
             raise ValueError("Only avg consensus can be used after Softmax")
@@ -47,7 +48,8 @@ class TSN(nn.Module):
         consensus_module:   {}
         dropout_ratio:      {}
         img_feature_dim:    {}
-            """.format(base_model, self.modality, self.num_segments, self.new_length, consensus_type, self.dropout, self.img_feature_dim)))
+            """.format(base_model, self.modality, self.num_segments, self.new_length, consensus_type, self.dropout,
+                       self.img_feature_dim)))
 
         self._prepare_base_model(base_model, self.num_segments)
         feature_dim = self._prepare_tsn(num_class)
@@ -61,7 +63,7 @@ class TSN(nn.Module):
             self.partialBN(True)
 
     def _prepare_tsn(self, num_class):
-        
+
         feature_dim = getattr(self.base_model, self.base_model.last_layer_name).in_features
         if self.dropout == 0:
             setattr(self.base_model, self.base_model.last_layer_name, nn.Linear(feature_dim, num_class))
@@ -78,12 +80,12 @@ class TSN(nn.Module):
             if hasattr(self.new_fc, 'weight'):
                 normal_(self.new_fc.weight, 0, std)
                 constant_(self.new_fc.bias, 0)
-        
+
         return feature_dim
 
     def _prepare_base_model(self, base_model, num_segments):
         print(('=> base model: {}'.format(base_model)))
-        if 'resnet' in base_model :
+        if 'resnet' in base_model:
             self.base_model = tdn_net(base_model, num_segments)
             self.base_model.last_layer_name = 'fc'
             self.input_size = 224
@@ -91,7 +93,7 @@ class TSN(nn.Module):
             self.input_std = [0.229, 0.224, 0.225]
 
             self.base_model.avgpool = nn.AdaptiveAvgPool2d(1)
-        else :
+        else:
             raise ValueError('Unknown base model: {}'.format(base_model))
 
     def train(self, mode=True):
@@ -164,47 +166,45 @@ class TSN(nn.Module):
                 if len(list(m.parameters())) > 0:
                     raise ValueError("New atomic module type: {}. Need to give it a learning policy".format(type(m)))
 
-        if self.fc_lr5: # fine_tuning for UCF/HMDB
+        if self.fc_lr5:  # fine_tuning for UCF/HMDB
             return [
                 {'params': first_conv_weight, 'lr_mult': 5 if self.modality == 'Flow' else 1, 'decay_mult': 1,
-                'name': "first_conv_weight"},
+                 'name': "first_conv_weight"},
                 {'params': first_conv_bias, 'lr_mult': 10 if self.modality == 'Flow' else 2, 'decay_mult': 0,
-                'name': "first_conv_bias"},
+                 'name': "first_conv_bias"},
                 {'params': normal_weight, 'lr_mult': 1, 'decay_mult': 1,
-                'name': "normal_weight"},
+                 'name': "normal_weight"},
                 {'params': normal_bias, 'lr_mult': 2, 'decay_mult': 0,
-                'name': "normal_bias"},
+                 'name': "normal_bias"},
                 {'params': bn, 'lr_mult': 1, 'decay_mult': 0,
-                'name': "BN scale/shift"},
+                 'name': "BN scale/shift"},
                 {'params': custom_ops, 'lr_mult': 1, 'decay_mult': 1,
-                'name': "custom_ops"},
+                 'name': "custom_ops"},
                 {'params': lr5_weight, 'lr_mult': 5, 'decay_mult': 1,
-                'name': "lr5_weight"},
+                 'name': "lr5_weight"},
                 {'params': lr10_bias, 'lr_mult': 10, 'decay_mult': 0,
-                'name': "lr10_bias"},
+                 'name': "lr10_bias"},
             ]
-        else : # default 
+        else:  # default
             return [
                 {'params': first_conv_weight, 'lr_mult': 5 if self.modality == 'Flow' else 1, 'decay_mult': 1,
-                'name': "first_conv_weight"},
+                 'name': "first_conv_weight"},
                 {'params': first_conv_bias, 'lr_mult': 10 if self.modality == 'Flow' else 2, 'decay_mult': 0,
-                'name': "first_conv_bias"},
+                 'name': "first_conv_bias"},
                 {'params': normal_weight, 'lr_mult': 1, 'decay_mult': 1,
-                'name': "normal_weight"},
+                 'name': "normal_weight"},
                 {'params': normal_bias, 'lr_mult': 2, 'decay_mult': 0,
-                'name': "normal_bias"},
+                 'name': "normal_bias"},
                 {'params': bn, 'lr_mult': 1, 'decay_mult': 0,
-                'name': "BN scale/shift"},
+                 'name': "BN scale/shift"},
                 {'params': custom_ops, 'lr_mult': 1, 'decay_mult': 1,
-                'name': "custom_ops"},
+                 'name': "custom_ops"},
             ]
-
-
 
     def forward(self, input, no_reshape=False):
         if not no_reshape:
             sample_len = (3 if self.modality == "RGB" else 2) * self.new_length
-            base_out = self.base_model(input.view((-1, sample_len*5) + input.size()[-2:]))
+            base_out = self.base_model(input.view((-1, sample_len * 5) + input.size()[-2:]))
         else:
             base_out = self.base_model(input)
 
@@ -220,7 +220,6 @@ class TSN(nn.Module):
 
             return output.squeeze(1)
 
-
     @property
     def crop_size(self):
         return self.input_size
@@ -232,8 +231,7 @@ class TSN(nn.Module):
     def get_augmentation(self, flip=True):
         if flip:
             return torchvision.transforms.Compose([GroupMultiScaleCrop(self.input_size, [1, .875, .75, .66]),
-                                                       GroupRandomHorizontalFlip(is_flow=False)])
+                                                   GroupRandomHorizontalFlip(is_flow=False)])
         else:
             return torchvision.transforms.Compose([GroupMultiScaleCrop(self.input_size, [1, .875, .75, .66]),
-                                            GroupRandomHorizontalFlip_sth(self.target_transforms)])
-
+                                                   GroupRandomHorizontalFlip_sth(self.target_transforms)])

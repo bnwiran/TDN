@@ -33,7 +33,7 @@ class _ColorfulFormatter(logging.Formatter):
 # so that calling setup_logger multiple times won't add many handlers
 @functools.lru_cache()
 def setup_logger(
-    output=None, distributed_rank=0, *, color=True, name="moco", abbrev_name=None
+        output=None, distributed_rank=0, *, color=True, name="moco", abbrev_name=None
 ):
     """
     Initialize the detectron2 logger and set its verbosity level to "INFO".
@@ -44,6 +44,11 @@ def setup_logger(
         name (str): the root module name of this logger
     Returns:
         logging.Logger: a logger
+        :param output:
+        :param distributed_rank:
+        :param color:
+        :param name:
+        :param abbrev_name:
     """
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)

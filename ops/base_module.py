@@ -12,32 +12,32 @@ import torch.utils.model_zoo as model_zoo
 __all__ = ['FBResNet', 'fbresnet50', 'fbresnet101']
 
 model_urls = {
-        'fbresnet50': 'http://data.lip6.fr/cadene/pretrainedmodels/resnet50-19c8e357.pth',
-        'fbresnet101': 'http://data.lip6.fr/cadene/pretrainedmodels/resnet101-5d3b4d8f.pth'
+    'fbresnet50': 'http://data.lip6.fr/cadene/pretrainedmodels/resnet50-19c8e357.pth',
+    'fbresnet101': 'http://data.lip6.fr/cadene/pretrainedmodels/resnet101-5d3b4d8f.pth'
 }
 
 
 class mSEModule(nn.Module):
-    def __init__(self, channel, n_segment=8,index=1):
+    def __init__(self, channel, n_segment=8, index=1):
         super(mSEModule, self).__init__()
         self.channel = channel
         self.reduction = 16
         self.n_segment = n_segment
-        self.stride = 2**(index-1)
+        self.stride = 2 ** (index - 1)
         self.conv1 = nn.Conv2d(in_channels=self.channel,
-                out_channels=self.channel//self.reduction,
-                kernel_size=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(num_features=self.channel//self.reduction)
-        self.conv2 = nn.Conv2d(in_channels=self.channel//self.reduction,
-                out_channels=self.channel//self.reduction,
-                kernel_size=3, padding=1, groups=self.channel//self.reduction, bias=False)
+                               out_channels=self.channel // self.reduction,
+                               kernel_size=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(num_features=self.channel // self.reduction)
+        self.conv2 = nn.Conv2d(in_channels=self.channel // self.reduction,
+                               out_channels=self.channel // self.reduction,
+                               kernel_size=3, padding=1, groups=self.channel // self.reduction, bias=False)
 
         self.avg_pool_forward2 = nn.AvgPool2d(kernel_size=2, stride=2)
         self.avg_pool_forward4 = nn.AvgPool2d(kernel_size=4, stride=4)
-        
+
         self.sigmoid_forward = nn.Sigmoid()
 
-        self.avg_pool_backward2 = nn.AvgPool2d(kernel_size=2, stride=2)#nn.AdaptiveMaxPool2d(1)
+        self.avg_pool_backward2 = nn.AvgPool2d(kernel_size=2, stride=2)  # nn.AdaptiveMaxPool2d(1)
         self.avg_pool_backward4 = nn.AvgPool2d(kernel_size=4, stride=4)
 
         self.sigmoid_backward = nn.Sigmoid()
@@ -45,17 +45,19 @@ class mSEModule(nn.Module):
         self.pad1_forward = (0, 0, 0, 0, 0, 0, 0, 1)
         self.pad1_backward = (0, 0, 0, 0, 0, 0, 1, 0)
 
-        self.conv3 = nn.Conv2d(in_channels=self.channel//self.reduction,
-                 out_channels=self.channel, kernel_size=1, bias=False)
+        self.conv3 = nn.Conv2d(in_channels=self.channel // self.reduction,
+                               out_channels=self.channel, kernel_size=1, bias=False)
         self.bn3 = nn.BatchNorm2d(num_features=self.channel)
 
-        self.conv3_smallscale2 = nn.Conv2d(in_channels=self.channel//self.reduction,
-                                  out_channels=self.channel//self.reduction,padding=1, kernel_size=3, bias=False)
-        self.bn3_smallscale2 = nn.BatchNorm2d(num_features=self.channel//self.reduction)
-        
-        self.conv3_smallscale4 = nn.Conv2d(in_channels = self.channel//self.reduction,
-                                  out_channels=self.channel//self.reduction,padding=1, kernel_size=3, bias=False)
-        self.bn3_smallscale4 = nn.BatchNorm2d(num_features=self.channel//self.reduction)
+        self.conv3_smallscale2 = nn.Conv2d(in_channels=self.channel // self.reduction,
+                                           out_channels=self.channel // self.reduction, padding=1, kernel_size=3,
+                                           bias=False)
+        self.bn3_smallscale2 = nn.BatchNorm2d(num_features=self.channel // self.reduction)
+
+        self.conv3_smallscale4 = nn.Conv2d(in_channels=self.channel // self.reduction,
+                                           out_channels=self.channel // self.reduction, padding=1, kernel_size=3,
+                                           bias=False)
+        self.bn3_smallscale4 = nn.BatchNorm2d(num_features=self.channel // self.reduction)
 
     def spatial_pool(self, x):
         nt, channel, height, width = x.size()
@@ -70,30 +72,34 @@ class mSEModule(nn.Module):
         context_mask = context_mask.view(nt, 1, height * width)
         # [N, 1, H * W]
         context_mask = self.softmax(context_mask)
-        context_mask = context_mask.view(nt,1,height,width)
+        context_mask = context_mask.view(nt, 1, height, width)
         return context_mask
 
-
     def forward(self, x):
-        bottleneck = self.conv1(x) # nt, c//r, h, w
-        bottleneck = self.bn1(bottleneck) # nt, c//r, h, w
-        reshape_bottleneck = bottleneck.view((-1, self.n_segment) + bottleneck.size()[1:]) # n, t, c//r, h, w
-        
-        t_fea_forward, _ = reshape_bottleneck.split([self.n_segment -1, 1], dim=1) # n, t-1, c//r, h, w
-        _, t_fea_backward = reshape_bottleneck.split([1, self.n_segment -1], dim=1) # n, t-1, c//r, h, w
-        
-        conv_bottleneck = self.conv2(bottleneck) # nt, c//r, h, w
-        reshape_conv_bottleneck = conv_bottleneck.view((-1, self.n_segment) + conv_bottleneck.size()[1:]) # n, t, c//r, h, w
-        _, tPlusone_fea_forward = reshape_conv_bottleneck.split([1, self.n_segment-1], dim=1) # n, t-1, c//r, h, w
-        tPlusone_fea_backward ,_ = reshape_conv_bottleneck.split([self.n_segment-1, 1], dim=1) # n, t-1, c//r, h, w
-        diff_fea_forward = tPlusone_fea_forward - t_fea_forward # n, t-1, c//r, h, w
-        diff_fea_backward = tPlusone_fea_backward - t_fea_backward# n, t-1, c//r, h, w
-        diff_fea_pluszero_forward = F.pad(diff_fea_forward, self.pad1_forward, mode="constant", value=0) # n, t, c//r, h, w
-        diff_fea_pluszero_forward = diff_fea_pluszero_forward.view((-1,) + diff_fea_pluszero_forward.size()[2:]) #nt, c//r, h, w
-        diff_fea_pluszero_backward = F.pad(diff_fea_backward, self.pad1_backward, mode="constant", value=0) # n, t, c//r, h, w
-        diff_fea_pluszero_backward = diff_fea_pluszero_backward.view((-1,) + diff_fea_pluszero_backward.size()[2:]) #nt, c//r, h, w
-        y_forward_smallscale2 = self.avg_pool_forward2(diff_fea_pluszero_forward) # nt, c//r, 1, 1
-        y_backward_smallscale2 = self.avg_pool_backward2(diff_fea_pluszero_backward) # nt, c//r, 1, 1
+        bottleneck = self.conv1(x)  # nt, c//r, h, w
+        bottleneck = self.bn1(bottleneck)  # nt, c//r, h, w
+        reshape_bottleneck = bottleneck.view((-1, self.n_segment) + bottleneck.size()[1:])  # n, t, c//r, h, w
+
+        t_fea_forward, _ = reshape_bottleneck.split([self.n_segment - 1, 1], dim=1)  # n, t-1, c//r, h, w
+        _, t_fea_backward = reshape_bottleneck.split([1, self.n_segment - 1], dim=1)  # n, t-1, c//r, h, w
+
+        conv_bottleneck = self.conv2(bottleneck)  # nt, c//r, h, w
+        reshape_conv_bottleneck = conv_bottleneck.view(
+            (-1, self.n_segment) + conv_bottleneck.size()[1:])  # n, t, c//r, h, w
+        _, tPlusone_fea_forward = reshape_conv_bottleneck.split([1, self.n_segment - 1], dim=1)  # n, t-1, c//r, h, w
+        tPlusone_fea_backward, _ = reshape_conv_bottleneck.split([self.n_segment - 1, 1], dim=1)  # n, t-1, c//r, h, w
+        diff_fea_forward = tPlusone_fea_forward - t_fea_forward  # n, t-1, c//r, h, w
+        diff_fea_backward = tPlusone_fea_backward - t_fea_backward  # n, t-1, c//r, h, w
+        diff_fea_pluszero_forward = F.pad(diff_fea_forward, self.pad1_forward, mode="constant",
+                                          value=0)  # n, t, c//r, h, w
+        diff_fea_pluszero_forward = diff_fea_pluszero_forward.view(
+            (-1,) + diff_fea_pluszero_forward.size()[2:])  # nt, c//r, h, w
+        diff_fea_pluszero_backward = F.pad(diff_fea_backward, self.pad1_backward, mode="constant",
+                                           value=0)  # n, t, c//r, h, w
+        diff_fea_pluszero_backward = diff_fea_pluszero_backward.view(
+            (-1,) + diff_fea_pluszero_backward.size()[2:])  # nt, c//r, h, w
+        y_forward_smallscale2 = self.avg_pool_forward2(diff_fea_pluszero_forward)  # nt, c//r, 1, 1
+        y_backward_smallscale2 = self.avg_pool_backward2(diff_fea_pluszero_backward)  # nt, c//r, 1, 1
 
         y_forward_smallscale4 = diff_fea_pluszero_forward
         y_backward_smallscale4 = diff_fea_pluszero_backward
@@ -102,42 +108,45 @@ class mSEModule(nn.Module):
 
         y_forward_smallscale4 = self.bn3_smallscale4(self.conv3_smallscale4(y_forward_smallscale4))
         y_backward_smallscale4 = self.bn3_smallscale4(self.conv3_smallscale4(y_backward_smallscale4))
-        
+
         y_forward_smallscale2 = F.interpolate(y_forward_smallscale2, diff_fea_pluszero_forward.size()[2:])
         y_backward_smallscale2 = F.interpolate(y_backward_smallscale2, diff_fea_pluszero_backward.size()[2:])
-        
-        y_forward = self.bn3(self.conv3(1.0/3.0*diff_fea_pluszero_forward + 1.0/3.0*y_forward_smallscale2 + 1.0/3.0*y_forward_smallscale4))# nt, c, 1, 1
-        y_backward = self.bn3(self.conv3(1.0/3.0*diff_fea_pluszero_backward + 1.0/3.0*y_backward_smallscale2 + 1.0/3.0*y_backward_smallscale4)) # nt, c, 1, 1
+
+        y_forward = self.bn3(self.conv3(
+            1.0 / 3.0 * diff_fea_pluszero_forward + 1.0 / 3.0 * y_forward_smallscale2 + 1.0 / 3.0 * y_forward_smallscale4))  # nt, c, 1, 1
+        y_backward = self.bn3(self.conv3(
+            1.0 / 3.0 * diff_fea_pluszero_backward + 1.0 / 3.0 * y_backward_smallscale2 + 1.0 / 3.0 * y_backward_smallscale4))  # nt, c, 1, 1
 
         y_forward = self.sigmoid_forward(y_forward) - 0.5
         y_backward = self.sigmoid_backward(y_backward) - 0.5
 
-        y = 0.5*y_forward + 0.5*y_backward
-        output = x + x*y
+        y = 0.5 * y_forward + 0.5 * y_backward
+        output = x + x * y
         return output
 
+
 class ShiftModule(nn.Module):
-    def __init__(self, input_channels, n_segment=8,n_div=8, mode='shift'):
+    def __init__(self, input_channels, n_segment=8, n_div=8, mode='shift'):
         super(ShiftModule, self).__init__()
         self.input_channels = input_channels
         self.n_segment = n_segment
         self.fold_div = n_div
         self.fold = self.input_channels // self.fold_div
-        self.conv = nn.Conv1d(self.fold_div*self.fold, self.fold_div*self.fold,
-                kernel_size=3, padding=1, groups=self.fold_div*self.fold,
-                bias=False)
+        self.conv = nn.Conv1d(self.fold_div * self.fold, self.fold_div * self.fold,
+                              kernel_size=3, padding=1, groups=self.fold_div * self.fold,
+                              bias=False)
 
         if mode == 'shift':
             self.conv.weight.requires_grad = True
             self.conv.weight.data.zero_()
-            self.conv.weight.data[:self.fold, 0, 2] = 1 # shift left
-            self.conv.weight.data[self.fold: 2 * self.fold, 0, 0] = 1 # shift right
-            if 2*self.fold < self.input_channels:
-                self.conv.weight.data[2 * self.fold:, 0, 1] = 1 # fixed
+            self.conv.weight.data[:self.fold, 0, 2] = 1  # shift left
+            self.conv.weight.data[self.fold: 2 * self.fold, 0, 0] = 1  # shift right
+            if 2 * self.fold < self.input_channels:
+                self.conv.weight.data[2 * self.fold:, 0, 1] = 1  # fixed
         elif mode == 'fixed':
             self.conv.weight.requires_grad = True
             self.conv.weight.data.zero_()
-            self.conv.weight.data[:, 0, 1] = 1 # fixed
+            self.conv.weight.data[:, 0, 1] = 1  # fixed
         elif mode == 'norm':
             self.conv.weight.requires_grad = True
 
@@ -145,16 +154,17 @@ class ShiftModule(nn.Module):
         nt, c, h, w = x.size()
         n_batch = nt // self.n_segment
         x = x.view(n_batch, self.n_segment, c, h, w)
-        x = x.permute(0, 3, 4, 2, 1) # (n_batch, h, w, c, n_segment)
-        x = x.contiguous().view(n_batch*h*w, c, self.n_segment)
-        x = self.conv(x) # (n_batch*h*w, c, n_segment)
+        x = x.permute(0, 3, 4, 2, 1)  # (n_batch, h, w, c, n_segment)
+        x = x.contiguous().view(n_batch * h * w, c, self.n_segment)
+        x = self.conv(x)  # (n_batch*h*w, c, n_segment)
         x = x.view(n_batch, h, w, c, self.n_segment)
-        x = x.permute(0, 4, 3, 1, 2) # (n_batch, n_segment, c, h, w)
+        x = x.permute(0, 4, 3, 1, 2)  # (n_batch, n_segment, c, h, w)
         x = x.contiguous().view(nt, c, h, w)
         return x
 
+
 def conv3x3(in_planes, out_planes, stride=1):
-    "3x3 convolution with padding"
+    """3x3 convolution with padding"""
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
                      padding=1, bias=True)
 
@@ -189,6 +199,7 @@ class BasicBlock(nn.Module):
         out = self.relu(out)
 
         return out
+
 
 class Bottleneck(nn.Module):
     expansion = 4
@@ -231,6 +242,7 @@ class Bottleneck(nn.Module):
 
         return out
 
+
 class BottleneckShift(nn.Module):
     expansion = 4
 
@@ -239,7 +251,7 @@ class BottleneckShift(nn.Module):
         self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=True)
         self.bn1 = nn.BatchNorm2d(planes)
         self.num_segments = num_segments
-        self.mse = mSEModule(planes, n_segment=self.num_segments,index=1) 
+        self.mse = mSEModule(planes, n_segment=self.num_segments, index=1)
         self.shift = ShiftModule(planes, n_segment=self.num_segments, n_div=8, mode='shift')
 
         self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride,
@@ -277,6 +289,7 @@ class BottleneckShift(nn.Module):
 
         return out
 
+
 class FBResNet(nn.Module):
 
     def __init__(self, num_segments, block, layers, num_classes=1000):
@@ -290,14 +303,14 @@ class FBResNet(nn.Module):
         super(FBResNet, self).__init__()
 
         self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
-                                bias=True)
+                               bias=True)
         self.bn1 = nn.BatchNorm2d(64)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        self.layer1 = self._make_layer(self.num_segments,Bottleneck, 64, layers[0])
-        self.layer2 = self._make_layer(self.num_segments,block, 128, layers[1], stride=2)
-        self.layer3 = self._make_layer(self.num_segments,block, 256, layers[2], stride=2)
-        self.layer4 = self._make_layer(self.num_segments,block, 512, layers[3], stride=2)
+        self.layer1 = self._make_layer(self.num_segments, Bottleneck, 64, layers[0])
+        self.layer2 = self._make_layer(self.num_segments, block, 128, layers[1], stride=2)
+        self.layer3 = self._make_layer(self.num_segments, block, 256, layers[2], stride=2)
+        self.layer4 = self._make_layer(self.num_segments, block, 512, layers[3], stride=2)
         self.last_linear = nn.Linear(512 * block.expansion, num_classes)
 
         for m in self.modules():
@@ -308,8 +321,7 @@ class FBResNet(nn.Module):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
 
-
-    def _make_layer(self, num_segments ,block, planes, blocks, stride=1):
+    def _make_layer(self, num_segments, block, planes, blocks, stride=1):
         downsample = None
         if stride != 1 or self.inplanes != planes * block.expansion:
             downsample = nn.Sequential(
@@ -318,14 +330,12 @@ class FBResNet(nn.Module):
                 nn.BatchNorm2d(planes * block.expansion),
             )
 
-        layers = []
-        layers.append(block(num_segments, self.inplanes, planes, stride, downsample))
+        layers = [block(num_segments, self.inplanes, planes, stride, downsample)]
         self.inplanes = planes * block.expansion
         for i in range(1, blocks):
             layers.append(block(num_segments, self.inplanes, planes))
 
         return nn.Sequential(*layers)
-
 
     def features(self, input):
         x = self.conv1(input)
@@ -347,32 +357,31 @@ class FBResNet(nn.Module):
         x = self.last_linear(x)
         return x
 
-
     def forward(self, input):
         x = self.features(input)
         x = self.logits(x)
         return x
 
-def fbresnet50(num_segments=8,pretrained=False,num_classes=1000):
+
+def fbresnet50(num_segments=8, pretrained=False, num_classes=1000):
     """Constructs a ResNet-50 model.
 
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
     """
-    model = FBResNet(num_segments,BottleneckShift, [3, 4, 6, 3], num_classes=num_classes)
+    model = FBResNet(num_segments, BottleneckShift, [3, 4, 6, 3], num_classes=num_classes)
     if pretrained:
-         model.load_state_dict(model_zoo.load_url(model_urls['fbresnet50']),strict=False)
+        model.load_state_dict(model_zoo.load_url(model_urls['fbresnet50']), strict=False)
     return model
 
 
-def fbresnet101(num_segments,pretrained=False,num_classes=1000):
+def fbresnet101(num_segments, pretrained=False, num_classes=1000):
     """Constructs a ResNet-101 model.
 
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
     """
-    model = FBResNet(num_segments,BottleneckShift, [3, 4, 23, 3], num_classes=num_classes)
+    model = FBResNet(num_segments, BottleneckShift, [3, 4, 23, 3], num_classes=num_classes)
     if pretrained:
-        model.load_state_dict(model_zoo.load_url(model_urls['fbresnet101']),strict=False)
+        model.load_state_dict(model_zoo.load_url(model_urls['fbresnet101']), strict=False)
     return model
-

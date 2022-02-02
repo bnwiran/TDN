@@ -5,7 +5,6 @@
 
 import os
 import time
-import torch
 import torch.nn.parallel
 from torch.nn.parallel import DistributedDataParallel
 import torch.distributed as dist
@@ -22,7 +21,7 @@ from opts import parser
 from ops import dataset_config
 from ops.utils import AverageMeter, accuracy
 from tensorboardX import SummaryWriter
-from torch.utils.data import *
+
 import torchvision
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3,4,5,6,7'
@@ -37,9 +36,12 @@ def main():
     torch.cuda.set_device(args.local_rank)
     torch.distributed.init_process_group(backend='nccl', init_method='env://')
 
-    num_class, args.train_list, args.val_list, args.root_path, prefix = dataset_config.return_dataset(args.dataset, args.modality)
+    num_class, args.train_list, args.val_list, args.root_path, prefix = dataset_config.return_dataset(args.dataset,
+                                                                                                      args.modality)
     full_arch_name = args.arch
-    args.store_name = '_'.join(['TDN_', args.dataset, args.modality, full_arch_name, args.consensus_type, 'segment%d' % args.num_segments, 'e{}'.format(args.epochs)])
+    args.store_name = '_'.join(
+        ['TDN_', args.dataset, args.modality, full_arch_name, args.consensus_type, 'segment%d' % args.num_segments,
+         'e{}'.format(args.epochs)])
     if args.pretrain != 'imagenet':
         args.store_name += '_{}'.format(args.pretrain)
     if args.dense_sample:
@@ -92,17 +94,19 @@ def main():
         num_segments=args.num_segments,
         modality=args.modality,
         image_tmpl=prefix,
-        transform=torchvision.transforms.Compose([train_augmentation,
+        transform=torchvision.transforms.Compose([
+            train_augmentation,
             Stack(roll=(args.arch in ['BNInception', 'InceptionV3'])),
-            ToTorchFormatTensor(div=(args.arch not in ['BNInception', 'InceptionV3'])),
-            normalize,]),
+            ToTorchFormatTensor(
+                div=(args.arch not in ['BNInception', 'InceptionV3'])),
+            normalize, ]),
         dense_sample=args.dense_sample)
 
     train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
 
     train_loader = torch.utils.data.DataLoader(train_dataset,
-        batch_size=args.batch_size, num_workers=args.workers,
-        pin_memory=True, sampler=train_sampler,drop_last=True)  
+                                               batch_size=args.batch_size, num_workers=args.workers,
+                                               pin_memory=True, sampler=train_sampler, drop_last=True)
 
     val_dataset = TSNDataSet(
         args.dataset,
@@ -113,16 +117,16 @@ def main():
         image_tmpl=prefix,
         random_shift=False,
         transform=torchvision.transforms.Compose([
-            GroupScale(int(scale_size)),GroupCenterCrop(crop_size),
+            GroupScale(int(scale_size)), GroupCenterCrop(crop_size),
             Stack(roll=(args.arch in ['BNInception', 'InceptionV3'])),
             ToTorchFormatTensor(div=(args.arch not in ['BNInception', 'InceptionV3'])),
-            normalize,]),
+            normalize, ]),
         dense_sample=args.dense_sample)
 
     val_sampler = torch.utils.data.distributed.DistributedSampler(val_dataset)
     val_loader = torch.utils.data.DataLoader(val_dataset,
-        batch_size=args.batch_size, num_workers=args.workers, 
-        pin_memory=True, sampler=val_sampler, drop_last=True)
+                                             batch_size=args.batch_size, num_workers=args.workers,
+                                             pin_memory=True, sampler=val_sampler, drop_last=True)
 
     # define loss function (criterion) and optimizer
     if args.loss_type == 'nll':
@@ -136,7 +140,8 @@ def main():
 
     scheduler = get_scheduler(optimizer, len(train_loader), args)
 
-    model = DistributedDataParallel(model.cuda(), device_ids=[args.local_rank], broadcast_buffers=True, find_unused_parameters=True)
+    model = DistributedDataParallel(model.cuda(), device_ids=[args.local_rank], broadcast_buffers=True,
+                                    find_unused_parameters=True)
 
     if args.resume:
         if os.path.isfile(args.resume):
@@ -179,7 +184,6 @@ def main():
         model_dict.update(sd)
         model.load_state_dict(model_dict)
 
-
     with open(os.path.join(args.root_log, args.store_name, 'args.txt'), 'w') as f:
         f.write(str(args))
 
@@ -208,7 +212,8 @@ def main():
 
     for epoch in range(args.start_epoch, args.epochs):
         train_loader.sampler.set_epoch(epoch)
-        train_loss, train_top1, train_top5 = train(train_loader, model, criterion, optimizer, epoch=epoch, logger=logger, scheduler=scheduler)
+        train_loss, train_top1, train_top5 = train(train_loader, model, criterion, optimizer, epoch=epoch,
+                                                   logger=logger, scheduler=scheduler)
         if dist.get_rank() == 0:
             tf_writer.add_scalar('loss/train', train_loss, epoch)
             tf_writer.add_scalar('acc/train_top1', train_top1, epoch)
@@ -290,8 +295,8 @@ def train(train_loader, model, criterion, optimizer, epoch, logger=None, schedul
                          'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
                          'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
                          'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
-                             epoch, i, len(train_loader), batch_time=batch_time, data_time=data_time, loss=losses,
-                             top1=top1, top5=top5, lr=optimizer.param_groups[-1]['lr'])))  # TODO
+                epoch, i, len(train_loader), batch_time=batch_time, data_time=data_time, loss=losses,
+                top1=top1, top5=top5, lr=optimizer.param_groups[-1]['lr'])))  # TODO
     return losses.avg, top1.avg, top5.avg
 
 
@@ -330,9 +335,9 @@ def validate(val_loader, model, criterion, logger=None):
                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
                      'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
                      'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
-                         i, len(val_loader), batch_time=batch_time, loss=losses, top1=top1, top5=top5)))
+                        i, len(val_loader), batch_time=batch_time, loss=losses, top1=top1, top5=top5)))
     logger.info(('Testing Results: Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f} Loss {loss.avg:.5f}'
-        .format(top1=top1, top5=top5, loss=losses)))
+                 .format(top1=top1, top5=top5, loss=losses)))
     return top1.avg, top5.avg, losses.avg
 
 
