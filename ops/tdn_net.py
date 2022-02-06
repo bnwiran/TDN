@@ -83,7 +83,7 @@ def tdn_net(base_model=None, num_segments=8, pretrained=True, **kwargs):
         resnet_model = fbresnet101(num_segments, pretrained)
         resnet_model1 = fbresnet101(num_segments, pretrained)
 
-    if num_segments is 8:
+    if num_segments == 8:
         model = TDN_Net(resnet_model, resnet_model1, apha=0.5, belta=0.5)
     else:
         model = TDN_Net(resnet_model, resnet_model1, apha=0.75, belta=0.25)

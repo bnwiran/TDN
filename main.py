@@ -36,12 +36,12 @@ def main():
     torch.cuda.set_device(args.local_rank)
     torch.distributed.init_process_group(backend='nccl', init_method='env://')
 
-    num_class, args.train_list, args.val_list, args.root_path, prefix = dataset_config.return_dataset(args.dataset,
-                                                                                                      args.modality)
+    num_class, args.train_list, args.val_list, prefix = dataset_config.return_dataset(args.root_path, args.dataset,
+                                                                                      args.modality)
     full_arch_name = args.arch
     args.store_name = '_'.join(
-        ['TDN_', args.dataset, args.modality, full_arch_name, args.consensus_type, 'segment%d' % args.num_segments,
-         'e{}'.format(args.epochs)])
+        ['TDN_', args.dataset, args.modality, full_arch_name, args.consensus_type, f'segment{args.num_segments}',
+         f'e{args.epochs}'])
     if args.pretrain != 'imagenet':
         args.store_name += '_{}'.format(args.pretrain)
     if args.dense_sample:

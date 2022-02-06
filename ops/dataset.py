@@ -4,7 +4,6 @@
 # tongzhan@smail.nju.edu.cn
 
 import torch.utils.data as data
-import decord
 from PIL import Image
 import os
 import numpy as np
@@ -58,15 +57,16 @@ class TSNDataSet(data.Dataset):
     def _load_image(self, directory, idx):
         if self.modality == 'RGB':
             try:
-                return [Image.open(os.path.join(self.root_path, directory, self.image_tmpl.format(idx))).convert('RGB')]
+                return [Image.open(os.path.join(directory, self.image_tmpl.format(idx))).convert('RGB')]
             except Exception:
-                print('error loading image:', os.path.join(self.root_path, directory, self.image_tmpl.format(idx)))
-                return [Image.open(os.path.join(self.root_path, directory, self.image_tmpl.format(1))).convert('RGB')]
+                print('error loading image:', os.path.join(directory, self.image_tmpl.format(idx)))
+                return [Image.open(os.path.join(directory, self.image_tmpl.format(1))).convert('RGB')]
 
     def _parse_list(self):
         # check the frame number is large >3:
         tmp = [x.strip().split(' ') for x in open(self.list_file)]
         if len(tmp[0]) == 3:  # skip remove_missing for decoding "raw_video label" type dataset_config
+            tmp = [[os.path.join(self.root_path, self.modality, item[0]), item[1], item[2]] for item in tmp]
             if not self.test_mode or self.remove_missing:
                 tmp = [item for item in tmp if int(item[1]) >= 8]
         self.video_list = [VideoRecord(item) for item in tmp]
@@ -74,7 +74,7 @@ class TSNDataSet(data.Dataset):
         if self.image_tmpl == '{:06d}-{}_{:05d}.jpg':
             for v in self.video_list:
                 v._data[1] = int(v._data[1]) / 2
-        print('video number:%d' % (len(self.video_list)))
+        print(f'Videos count: {len(self.video_list)}')
 
     def _sample_indices(self, video_list):
         if not self.I3D_sample:  # TSN uniformly sampling for TDN
@@ -161,22 +161,8 @@ class TSNDataSet(data.Dataset):
     def __getitem__(self, index):
         record = self.video_list[index]
 
-        if 'something' in self.dataset:
-            decode_boo = False
-            video_list = os.listdir(record.path)
-
-        else:
-            decode_boo = True
-            try:
-                directory = record.path
-                if directory[-4:] != ".mp4":
-                    video_path = directory + ".mp4"
-                else:
-                    video_path = directory
-                video_list = decord.VideoReader(video_path)
-            except UnicodeDecodeError:
-                decode_boo = False
-                video_list = os.listdir(record.path)
+        decode_boo = False
+        video_list = os.listdir(record.path)
 
         if not self.test_mode:
             if self.I3D_sample:
@@ -202,14 +188,15 @@ class TSNDataSet(data.Dataset):
                 else:
                     seg_imgs = self._load_image(record.path, p)
                 images.extend(seg_imgs)
-                if (len(video_list) - self.new_length * 1 + 1) >= 8:
+                if (len(video_list) - self.new_length + 1) >= 8:
                     if p < (len(video_list)):
                         p += 1
                 else:
                     if p < (len(video_list)):
                         p += 1
 
-        process_data, record_label = self.transform((images, record.label))
+        process_data, record_label = self.transform((images, record.label)) if self.transform \
+            else (images, record.label)
 
         return process_data, record_label
 
