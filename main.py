@@ -33,8 +33,13 @@ def main():
     global args, best_prec1
     args = parser.parse_args()
 
-    torch.cuda.set_device(args.local_rank)
-    torch.distributed.init_process_group(backend='nccl', init_method='env://')
+    rank = os.environ.get("SLURM_LOCALID")
+    current_device = 0
+    torch.cuda.set_device(current_device)
+
+    print('From Rank: {}, ==> Initializing Process Group...'.format(rank))
+    dist.init_process_group(backend="mpi", init_method=args.init_method)
+    print("process group ready!")
 
     num_class, args.train_list, args.val_list, prefix = dataset_config.return_dataset(args.root_path, args.dataset,
                                                                                       args.modality)
@@ -57,6 +62,7 @@ def main():
                           name=f'TDN')
     logger.info('storing name: ' + args.store_name)
 
+    print('From Rank: {}, ==> Making model..'.format(rank))
     model = TSN(num_class,
                 args.num_segments,
                 args.modality,
@@ -140,8 +146,9 @@ def main():
 
     scheduler = get_scheduler(optimizer, len(train_loader), args)
 
-    model = DistributedDataParallel(model.cuda(), device_ids=[args.local_rank], broadcast_buffers=True,
-                                    find_unused_parameters=True)
+    # model = DistributedDataParallel(model.cuda(), device_ids=[args.local_rank], broadcast_buffers=True,
+    #                                 find_unused_parameters=True)
+    torch.nn.parallel.DistributedDataParallel(model.cuda(), device_ids=[current_device])
 
     if args.resume:
         if os.path.isfile(args.resume):
