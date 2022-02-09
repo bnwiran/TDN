@@ -262,9 +262,9 @@ def train(train_loader, model, criterion, optimizer, epoch, logger=None, schedul
     top5 = AverageMeter()
 
     if args.no_partialbn:
-        model.module.partialBN(False)
+        model.partialBN(False)
     else:
-        model.module.partialBN(True)
+        model.partialBN(True)
 
     model.train()
 
