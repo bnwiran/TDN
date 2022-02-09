@@ -70,3 +70,4 @@ parser.add_argument('--dense_sample', default=False, action="store_true",
                     help='use dense sample for video dataset')
 parser.add_argument("--local_rank", type=int,
                     help='local rank for DistributedDataParallel')
+parser.add_argument('--init_method', default='tcp://127.0.0.1:3456', type=str, help='')
