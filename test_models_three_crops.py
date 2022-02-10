@@ -82,7 +82,7 @@ def accuracy(output, target, topk=(1,)):
     batch_size = target.size(0)
     _, pred = output.topk(maxk, 1, True, True)
     pred = pred.t()
-    correct = pred.eq(target.view(1, -1).expand_as(pred))
+    correct = pred.eq(target.reshape(1, -1).expand_as(pred))
     res = []
     for k in topk:
         correct_k = correct[:k].reshape(-1).float().sum(0)
@@ -217,14 +217,14 @@ def eval_video(video_data, net, this_test_segments, modality):
             raise ValueError("Unknown modality " + modality)
 
         start_time = time.time()
-        data_in = data.view(-1, length * 5, data.size(2), data.size(3))
-        data_in = data_in.view(batch_size, num_crop, this_test_segments, length * 5, data_in.size(2), data_in.size(3))
+        data_in = data.reshape(-1, length * 5, data.size(2), data.size(3))
+        data_in = data_in.reshape(batch_size, num_crop, this_test_segments, length * 5, data_in.size(2), data_in.size(3))
         data_in0 = data_in[:, 0, :, :, :, :]
         data_in1 = data_in[:, 1, :, :, :, :]
         data_in2 = data_in[:, 2, :, :, :, :]
-        data_in0 = data_in0.view(batch_size, 1, this_test_segments, length * 5, data.size(2), data.size(3))
-        data_in1 = data_in1.view(batch_size, 1, this_test_segments, length * 5, data.size(2), data.size(3))
-        data_in2 = data_in2.view(batch_size, 1, this_test_segments, length * 5, data.size(2), data.size(3))
+        data_in0 = data_in0.reshape(batch_size, 1, this_test_segments, length * 5, data.size(2), data.size(3))
+        data_in1 = data_in1.reshape(batch_size, 1, this_test_segments, length * 5, data.size(2), data.size(3))
+        data_in2 = data_in2.reshape(batch_size, 1, this_test_segments, length * 5, data.size(2), data.size(3))
         rst0 = net(data_in0)
         rst0 = rst0.reshape(batch_size, 1, -1)
         rst1 = net(data_in1)

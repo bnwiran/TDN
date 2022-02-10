@@ -63,28 +63,28 @@ class mSEModule(nn.Module):
         nt, channel, height, width = x.size()
         input_x = x
         # [N, C, H * W]
-        input_x = input_x.view(nt, channel, height * width)
+        input_x = input_x.reshape(nt, channel, height * width)
         # [N, 1, C, H * W]
         input_x = input_x.unsqueeze(1)
         # [N, 1, H, W]
         context_mask = self.conv_mask(x)
         # [N, 1, H * W]
-        context_mask = context_mask.view(nt, 1, height * width)
+        context_mask = context_mask.reshape(nt, 1, height * width)
         # [N, 1, H * W]
         context_mask = self.softmax(context_mask)
-        context_mask = context_mask.view(nt, 1, height, width)
+        context_mask = context_mask.reshape(nt, 1, height, width)
         return context_mask
 
     def forward(self, x):
         bottleneck = self.conv1(x)  # nt, c//r, h, w
         bottleneck = self.bn1(bottleneck)  # nt, c//r, h, w
-        reshape_bottleneck = bottleneck.view((-1, self.n_segment) + bottleneck.size()[1:])  # n, t, c//r, h, w
+        reshape_bottleneck = bottleneck.reshape((-1, self.n_segment) + bottleneck.size()[1:])  # n, t, c//r, h, w
 
         t_fea_forward, _ = reshape_bottleneck.split([self.n_segment - 1, 1], dim=1)  # n, t-1, c//r, h, w
         _, t_fea_backward = reshape_bottleneck.split([1, self.n_segment - 1], dim=1)  # n, t-1, c//r, h, w
 
         conv_bottleneck = self.conv2(bottleneck)  # nt, c//r, h, w
-        reshape_conv_bottleneck = conv_bottleneck.view(
+        reshape_conv_bottleneck = conv_bottleneck.reshape(
             (-1, self.n_segment) + conv_bottleneck.size()[1:])  # n, t, c//r, h, w
         _, tPlusone_fea_forward = reshape_conv_bottleneck.split([1, self.n_segment - 1], dim=1)  # n, t-1, c//r, h, w
         tPlusone_fea_backward, _ = reshape_conv_bottleneck.split([self.n_segment - 1, 1], dim=1)  # n, t-1, c//r, h, w
@@ -92,11 +92,11 @@ class mSEModule(nn.Module):
         diff_fea_backward = tPlusone_fea_backward - t_fea_backward  # n, t-1, c//r, h, w
         diff_fea_pluszero_forward = F.pad(diff_fea_forward, self.pad1_forward, mode="constant",
                                           value=0)  # n, t, c//r, h, w
-        diff_fea_pluszero_forward = diff_fea_pluszero_forward.view(
+        diff_fea_pluszero_forward = diff_fea_pluszero_forward.reshape(
             (-1,) + diff_fea_pluszero_forward.size()[2:])  # nt, c//r, h, w
         diff_fea_pluszero_backward = F.pad(diff_fea_backward, self.pad1_backward, mode="constant",
                                            value=0)  # n, t, c//r, h, w
-        diff_fea_pluszero_backward = diff_fea_pluszero_backward.view(
+        diff_fea_pluszero_backward = diff_fea_pluszero_backward.reshape(
             (-1,) + diff_fea_pluszero_backward.size()[2:])  # nt, c//r, h, w
         y_forward_smallscale2 = self.avg_pool_forward2(diff_fea_pluszero_forward)  # nt, c//r, 1, 1
         y_backward_smallscale2 = self.avg_pool_backward2(diff_fea_pluszero_backward)  # nt, c//r, 1, 1
@@ -153,13 +153,13 @@ class ShiftModule(nn.Module):
     def forward(self, x):
         nt, c, h, w = x.size()
         n_batch = nt // self.n_segment
-        x = x.view(n_batch, self.n_segment, c, h, w)
+        x = x.reshape(n_batch, self.n_segment, c, h, w)
         x = x.permute(0, 3, 4, 2, 1)  # (n_batch, h, w, c, n_segment)
-        x = x.contiguous().view(n_batch * h * w, c, self.n_segment)
+        x = x.contiguous().reshape(n_batch * h * w, c, self.n_segment)
         x = self.conv(x)  # (n_batch*h*w, c, n_segment)
-        x = x.view(n_batch, h, w, c, self.n_segment)
+        x = x.reshape(n_batch, h, w, c, self.n_segment)
         x = x.permute(0, 4, 3, 1, 2)  # (n_batch, n_segment, c, h, w)
-        x = x.contiguous().view(nt, c, h, w)
+        x = x.contiguous().reshape(nt, c, h, w)
         return x
 
 
@@ -353,7 +353,7 @@ class FBResNet(nn.Module):
     def logits(self, features):
         adaptiveAvgPoolWidth = features.shape[2]
         x = F.avg_pool2d(features, kernel_size=adaptiveAvgPoolWidth)
-        x = x.view(x.size(0), -1)
+        x = x.reshape(x.size(0), -1)
         x = self.last_linear(x)
         return x
 

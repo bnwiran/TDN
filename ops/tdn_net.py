@@ -45,7 +45,7 @@ class TDN_Net(nn.Module):
     def forward(self, x):
         x1, x2, x3, x4, x5 = x[:, 0:3, :, :], x[:, 3:6, :, :], x[:, 6:9, :, :], x[:, 9:12, :, :], x[:, 12:15, :, :]
         x_c5 = self.conv1_5(
-            self.avg_diff(torch.cat([x2 - x1, x3 - x2, x4 - x3, x5 - x4], 1).view(-1, 12, x2.size()[2], x2.size()[3])))
+            self.avg_diff(torch.cat([x2 - x1, x3 - x2, x4 - x3, x5 - x4], 1).reshape(-1, 12, x2.size()[2], x2.size()[3])))
         x_diff = self.maxpool_diff(1.0 / 1.0 * x_c5)
 
         temp_out_diff1 = x_diff
@@ -68,7 +68,7 @@ class TDN_Net(nn.Module):
         x = self.layer4_bak(x)
 
         x = self.avgpool(x)
-        x = x.view(x.size(0), -1)
+        x = x.reshape(x.size(0), -1)
 
         x = self.fc(x)
 
