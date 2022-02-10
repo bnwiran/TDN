@@ -5,6 +5,7 @@ import numpy as np
 import numbers
 import math
 import torch
+from torchvision.transforms import InterpolationMode
 
 
 class GroupRandomCrop(object):
@@ -106,10 +107,10 @@ class GroupScale(object):
     For example, if height > width, then image will be
     rescaled to (size * height / width, size)
     size: size of the smaller edge
-    interpolation: Default: PIL.Image.BILINEAR
+    interpolation: Default: torchvision.transforms.InterpolationMode.BILINEAR
     """
 
-    def __init__(self, size, interpolation=Image.BILINEAR):
+    def __init__(self, size, interpolation=InterpolationMode.BILINEAR):
         self.worker = torchvision.transforms.Resize(size, interpolation)
 
     def __call__(self, img):
