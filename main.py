@@ -319,6 +319,7 @@ def validate(val_loader, model, criterion, logger=None):
     with torch.no_grad():
         for i, (input, target) in enumerate(val_loader):
             target = target.cuda()
+            input = target.cuda()
             output = model(input)
 
             loss = criterion(output, target)
