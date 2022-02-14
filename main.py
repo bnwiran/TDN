@@ -6,13 +6,12 @@
 import os
 import time
 import torch.nn.parallel
-from torch.nn.parallel import DistributedDataParallel
 import torch.distributed as dist
 import torch.backends.cudnn as cudnn
 import torch.optim
 from torch.nn.utils import clip_grad_norm_
 from ops.dataset import TSNDataSet
-from ops.models import TSN
+from ops.stp_net import STP
 from ops.transforms import *
 from ops.logger import setup_logger
 from ops.lr_scheduler import get_scheduler
@@ -63,16 +62,18 @@ def main():
     logger.info('storing name: ' + args.store_name)
 
     print('From Rank: {}, ==> Making model..'.format(rank))
-    model = TSN(num_class,
-                args.num_segments,
-                args.modality,
-                base_model=args.arch,
-                consensus_type=args.consensus_type,
-                dropout=args.dropout,
-                img_feature_dim=args.img_feature_dim,
-                partial_bn=not args.no_partialbn,
-                pretrain=args.pretrain,
-                fc_lr5=(args.tune_from and args.dataset in args.tune_from))
+    # model = TSN(num_class,
+    #             args.num_segments,
+    #             args.modality,
+    #             base_model=args.arch,
+    #             consensus_type=args.consensus_type,
+    #             dropout=args.dropout,
+    #             img_feature_dim=args.img_feature_dim,
+    #             partial_bn=not args.no_partialbn,
+    #             pretrain=args.pretrain,
+    #             fc_lr5=(args.tune_from and args.dataset in args.tune_from))
+
+    model = STP(num_classes=num_class, in_channels=3)
 
     crop_size = model.crop_size
     scale_size = model.scale_size
